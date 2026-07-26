@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Briscola</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+<style>
+  :root{
+    --notte:#160f0c; --notte2:#241812; --legno:#3a2318; --bordo:#5b3a26;
+    --luce:#f4c878; --luce-soft:#f0d9a8;
+    --crema:#f7f0dd; --crema-edge:#e7d9bd;
+    --inchiostro:#eadfc8; --inchiostro-dim:#b09a7e;
+    --denari:#e0a626; --coppe:#c0403a; --spade:#3f6d99; --bastoni:#5a8a44;
+    --oro:#d9b25a; --oro-dim:#8a6f38;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua','Times New Roman',serif;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0}
+  body{
+    font-family:var(--sans);color:var(--inchiostro);
+    background:
+      radial-gradient(120% 90% at 50% 22%, #3a271b 0%, #251710 42%, #150e0a 78%, #0d0806 100%);
+    background-attachment:fixed;
+    min-height:100dvh;overflow-x:hidden;
+  }
+  h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0}
+  button{font-family:inherit}
+  .wrap{max-width:960px;margin:0 auto;padding:16px;min-height:100dvh;display:flex;flex-direction:column}
+
+  /* ---------- MENU ---------- */
+  .menu{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;padding:24px 8px}
+  .lamp{position:relative;padding:34px 10px 10px}
+  .lamp::before{content:"";position:absolute;top:-40px;left:50%;transform:translateX(-50%);
+    width:340px;height:220px;border-radius:50%;
+    background:radial-gradient(closest-side, rgba(244,200,120,.34), rgba(244,200,120,0) 72%);
+    filter:blur(4px);pointer-events:none;z-index:0}
+  .title{position:relative;z-index:1;font-size:clamp(52px,15vw,104px);line-height:.9;letter-spacing:.02em;
+    color:var(--crema);
+    text-shadow:0 1px 0 #fff3, 0 2px 14px rgba(244,200,120,.35), 0 14px 40px rgba(0,0,0,.6)}
+  .title .flourish{display:inline-block}
+  .suits-row{position:relative;z-index:1;display:flex;gap:18px;justify-content:center;margin:14px 0 6px}
+  .suits-row .suit-svg{width:30px;height:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+  .tagline{max-width:30ch;color:var(--inchiostro-dim);font-size:15px;line-height:1.5;margin:2px auto 22px}
+  .menu-actions{display:flex;flex-direction:column;gap:12px;width:min(360px,92vw)}
+  .btn{border:1px solid var(--bordo);border-radius:14px;padding:15px 18px;font-size:16px;font-weight:600;
+    color:var(--inchiostro);background:linear-gradient(180deg,#3a271b,#2a1a11);cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    box-shadow:0 6px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)}
+  .btn:hover{transform:translateY(-2px);border-color:var(--oro-dim)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:linear-gradient(180deg,#f4c878,#dca43e);color:#3a230e;border-color:#f0d9a8;
+    text-shadow:0 1px 0 rgba(255,255,255,.35)}
+  .btn.ghost{background:transparent;box-shadow:none;border-color:transparent;color:var(--inchiostro-dim);
+    padding:10px;font-weight:500;font-size:14px}
+  .btn.ghost:hover{color:var(--inchiostro);transform:none}
+  .btn:focus-visible,.card.playable:focus-visible{outline:3px solid var(--luce);outline-offset:2px}
+  .btn[disabled]{opacity:.5;cursor:default;transform:none}
+
+  /* ---------- PANELS (setup / online) ---------- */
+  .panel{width:min(520px,94vw);margin:0 auto;background:linear-gradient(180deg,#2b1c12,#221610);
+    border:1px solid var(--bordo);border-radius:18px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .panel h2{font-size:24px;margin-bottom:4px;color:var(--crema)}
+  .panel p.sub{color:var(--inchiostro-dim);font-size:14px;line-height:1.5;margin:0 0 16px}
+  label.fld{display:block;font-size:13px;color:var(--inchiostro-dim);margin:12px 0 5px;text-align:left}
+  input.txt,textarea.code{width:100%;font-family:var(--sans);font-size:15px;color:var(--crema);
+    background:#180f0a;border:1px solid var(--bordo);border-radius:10px;padding:12px}
+  textarea.code{font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;font-size:12px;
+    height:92px;resize:vertical;word-break:break-all;color:var(--luce-soft)}
+  input.txt:focus,textarea.code:focus{outline:none;border-color:var(--oro)}
+  .row{display:flex;gap:10px;margin-top:16px}
+  .row .btn{flex:1}
+  .step{display:flex;gap:12px;align-items:flex-start;margin:16px 0;text-align:left}
+  .step .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--legno);border:1px solid var(--bordo);
+    display:grid;place-items:center;font-family:var(--serif);font-size:14px;color:var(--luce-soft);margin-top:1px}
+  .step .body{flex:1;font-size:14px;color:var(--inchiostro);line-height:1.5}
+  .step .body b{color:var(--crema)}
+  .status{margin-top:14px;font-size:13px;padding:10px 12px;border-radius:10px;text-align:center;
+    background:#180f0a;border:1px solid var(--bordo);color:var(--inchiostro-dim)}
+  .status.ok{color:#bfe6a8;border-color:#3c5c2c}
+  .status.err{color:#f0b3ae;border-color:#6b332f}
+  .status.wait{color:var(--luce-soft)}
+  .small-copy-btn{margin-top:8px;font-size:13px;padding:9px 12px}
+  .codebox{display:flex;gap:7px;justify-content:center;margin:8px 0 14px;flex-wrap:nowrap}
+  .codebox .cd{width:44px;height:58px;border-radius:10px;background:#180f0a;border:1px solid var(--oro-dim);
+    display:grid;place-items:center;font-family:var(--serif);font-size:30px;color:var(--luce);
+    text-shadow:0 2px 12px rgba(244,200,120,.4)}
+  .codeinput{text-align:center;letter-spacing:.45em;font-size:30px;font-family:var(--serif);
+    color:var(--luce);caret-color:var(--luce);text-transform:uppercase;padding:14px;margin-top:6px}
+  .codeinput::placeholder{letter-spacing:.4em;color:#5a4636}
+  @media (max-width:420px){ .codebox .cd{width:40px;height:52px;font-size:26px} }
+
+  /* ---------- TABLE ---------- */
+  .felt{flex:1;display:flex;flex-direction:column;gap:6px;position:relative}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 2px 6px}
+  .topbar .brand{font-family:var(--serif);font-size:20px;color:var(--luce-soft);letter-spacing:.03em}
+  .icon-btn{border:1px solid var(--bordo);background:#2a1a11;color:var(--inchiostro);border-radius:10px;
+    padding:8px 12px;font-size:13px;cursor:pointer}
+  .icon-btn:hover{border-color:var(--oro-dim)}
+
+  .seat{display:flex;align-items:center;gap:10px}
+  .seat.opp{justify-content:center;flex-direction:column;gap:6px}
+  .seat.you{justify-content:center;flex-direction:column;gap:6px}
+  .nameplate{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--inchiostro)}
+  .nameplate .nm{font-weight:600;color:var(--crema)}
+  .nameplate .pts{font-family:var(--serif);font-size:15px;color:var(--luce-soft)}
+  .nameplate .pts b{font-size:19px}
+  .nameplate.active .nm::after{content:"";display:inline-block;width:7px;height:7px;margin-left:7px;border-radius:50%;
+    background:var(--luce);box-shadow:0 0 8px var(--luce);vertical-align:middle;animation:pulse 1.3s infinite}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+  .wins{font-size:12px;color:var(--inchiostro-dim)}
+
+  .hand{display:flex;justify-content:center;gap:8px;flex-wrap:nowrap}
+  .hand.opp{margin-top:2px}
+
+  .mid{flex:1;display:flex;align-items:center;justify-content:center;gap:clamp(14px,5vw,54px);position:relative;
+    min-height:180px}
+  .mid::before{content:"";position:absolute;inset:-8% 6%;border-radius:50%;
+    background:radial-gradient(closest-side, rgba(244,200,120,.13), rgba(244,200,120,0) 70%);pointer-events:none}
+  .deckzone{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:1}
+  .deckstack{position:relative;width:74px;height:112px}
+  .deckstack .card.back{position:absolute;top:0;left:0}
+  .deckstack .briscola{position:absolute;left:34px;top:24px;transform:rotate(90deg);transform-origin:center;
+    box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  .deckcount{font-size:12px;color:var(--inchiostro-dim)}
+  .deckcount b{color:var(--luce-soft);font-family:var(--serif);font-size:14px}
+  .brisc-badge{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .brisc-badge .ring{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+    background:#180f0a;border:1px solid var(--oro-dim)}
+  .brisc-badge .ring .suit-svg{width:30px;height:30px}
+  .brisc-badge span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--inchiostro-dim)}
+
+  .trickzone{position:relative;z-index:1;display:flex;gap:10px;min-width:170px;justify-content:center;align-items:center}
+  .played{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .played .who{font-size:11px;color:var(--inchiostro-dim);letter-spacing:.06em;text-transform:uppercase}
+  .played.win .card{box-shadow:0 0 0 3px var(--luce), 0 10px 26px rgba(244,200,120,.4)}
+  .played.win .who{color:var(--luce-soft)}
+  .trick-empty{color:var(--inchiostro-dim);font-size:13px;font-style:italic;opacity:.7}
+
+  .toast{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:5;
+    background:rgba(20,12,8,.92);border:1px solid var(--oro-dim);border-radius:999px;padding:8px 16px;
+    font-size:13px;color:var(--luce-soft);white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.4)}
+
+  /* ---------- CARDS ---------- */
+  .card{width:74px;height:112px;border-radius:9px;background:linear-gradient(160deg,var(--crema),var(--crema-edge));
+    border:1px solid #cbb98f;position:relative;box-shadow:0 5px 14px rgba(0,0,0,.4);color:#333;user-select:none;flex:none}
+  .card.small{width:52px;height:79px;border-radius:7px}
+  .card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
+  .card .corner.tl{top:5px;left:5px}
+  .card .corner.br{bottom:5px;right:5px;transform:rotate(180deg)}
+  .card .corner .rk{font-family:var(--serif);font-weight:700;font-size:16px}
+  .card.small .corner .rk{font-size:12px}
+  .card .corner .suit-svg{width:13px;height:13px}
+  .card.small .corner .suit-svg{width:10px;height:10px}
+  .card .pip{position:absolute;inset:0;display:grid;place-items:center}
+  .card .pip .suit-svg{width:40px;height:40px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.15))}
+  .card.small .pip .suit-svg{width:28px;height:28px}
+  .card.face{background:linear-gradient(160deg,#fbf6e7,#efe2c2)}
+  .card.face::after{content:"";position:absolute;inset:5px;border:1px solid var(--oro);border-radius:6px;opacity:.55;pointer-events:none}
+  .card.small.face::after{inset:4px}
+  .suit-denari{color:var(--denari)} .suit-coppe{color:var(--coppe)}
+  .suit-spade{color:var(--spade)} .suit-bastoni{color:var(--bastoni)}
+
+  .card.back{background:
+      repeating-linear-gradient(45deg,#5a2320 0 8px,#4a1c1a 8px 16px);
+    border:1px solid #7a3b2f;position:relative;overflow:hidden}
+  .card.back .back-art{position:absolute;inset:6px;border:1px solid rgba(244,200,120,.4);border-radius:6px}
+  .card.back .back-art::after{content:"";position:absolute;inset:0;margin:auto;width:26px;height:26px;
+    border-radius:50%;background:radial-gradient(circle,rgba(244,200,120,.5),rgba(244,200,120,0) 70%);
+    top:0;bottom:0;left:0;right:0}
+  .card.small.back .back-art{inset:4px}
+
+  .card.playable{cursor:pointer;transition:transform .13s ease, box-shadow .13s ease}
+  .card.playable:hover{transform:translateY(-12px);box-shadow:0 16px 30px rgba(0,0,0,.5)}
+  .hand.dim .card{opacity:.72}
+  @media (hover:none){.card.playable:hover{transform:none} .card.playable:active{transform:translateY(-8px)}}
+
+  /* ---------- OVERLAYS ---------- */
+  #overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
+    background:rgba(10,7,5,.78);backdrop-filter:blur(3px)}
+  #overlay.show{display:flex}
+  .ov-card{width:min(460px,94vw);background:linear-gradient(180deg,#2b1c12,#1f1410);border:1px solid var(--bordo);
+    border-radius:20px;padding:26px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .ov-card h2{font-size:26px;color:var(--crema);margin-bottom:8px}
+  .ov-card p{color:var(--inchiostro-dim);font-size:15px;line-height:1.55;margin:0 0 18px}
+  .handoff-icon{font-size:44px;margin-bottom:8px}
+  .final-score{display:flex;justify-content:center;gap:30px;margin:18px 0 22px}
+  .final-score .col{text-align:center}
+  .final-score .col .n{font-size:13px;color:var(--inchiostro-dim);margin-bottom:4px}
+  .final-score .col .v{font-family:var(--serif);font-size:40px;color:var(--luce-soft);line-height:1}
+  .final-score .col.win .v{color:var(--luce)}
+  .rules-list{text-align:left;font-size:14px;line-height:1.6;color:var(--inchiostro)}
+  .rules-list h3{font-size:15px;color:var(--luce-soft);margin:14px 0 4px}
+  .rules-list .valrow{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:4px}
+  .rules-list .chip{background:#180f0a;border:1px solid var(--bordo);border-radius:8px;padding:4px 9px;font-size:13px}
+  .rules-list .chip b{color:var(--luce-soft);font-family:var(--serif)}
+
+  @media (max-width:560px){
+    .wrap{padding:10px}
+    .card{width:62px;height:94px}
+    .deckstack{width:62px;height:94px}
+    .deckstack .briscola{left:28px;top:20px}
+    .mid{min-height:150px;gap:10px}
+    .card .pip .suit-svg{width:34px;height:34px}
+    .card .corner .rk{font-size:14px}
+    .brisc-badge .ring{width:44px;height:44px}
+    .brisc-badge .ring .suit-svg{width:26px;height:26px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="overlay"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   BRISCOLA — carte, regole, motore di gioco
+   ========================================================================= */
+const SUITS = ['denari','coppe','spade','bastoni'];
+const POINTS = {1:11, 3:10, 10:4, 9:3, 8:2}; // altrimenti 0
+const POWER_ORDER = [1,3,10,9,8,7,6,5,4,2];  // dal più forte al più debole
+function points(rank){ return POINTS[rank] || 0; }
+function power(rank){ return POWER_ORDER.length - POWER_ORDER.indexOf(rank); }
+function isFace(rank){ return rank >= 8; }
+function rankLabel(rank){ return ({1:'A',8:'F',9:'C',10:'R'})[rank] || String(rank); }
+
+function makeDeck(){
+  const d=[];
+  for(const s of SUITS) for(let r=1;r<=10;r++) d.push({suit:s, rank:r, id:s+'-'+r});
+  return d;
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function createState(names, wins){
+  const deck = shuffle(makeDeck());
+  const hands = [deck.splice(0,3), deck.splice(0,3)];
+  const briscolaCard = deck.shift();          // carta scoperta (trump)
+  const drawPile = deck.concat([briscolaCard]); // la briscola va in fondo: si pesca per ultima
+  const leader = Math.random()<0.5 ? 0 : 1;
+  return {
+    names:[...names], points:[0,0], wins:[...(wins||[0,0])],
+    hands, piles:[[],[]], drawPile,
+    briscolaCard, briscolaSuit: briscolaCard.suit,
+    leader, turn:leader, table:[], phase:'play',
+    winnerHighlight:null, lastTrick:null, over:null, winCounted:false
+  };
+}
+// a = giocata di chi ha aperto, b = risposta
+function trickWinnerPlayer(a, b, briscola){
+  const L=a.card, R=b.card; let respWins;
+  if(R.suit===L.suit) respWins = power(R.rank) > power(L.rank);
+  else if(R.suit===briscola) respWins = true;
+  else respWins = false;
+  return respWins ? b.player : a.player;
+}
+function playCard(s, playerIdx, cardId){
+  if(s.phase!=='play' || s.turn!==playerIdx) return false;
+  const hand=s.hands[playerIdx];
+  const i=hand.findIndex(c=>c.id===cardId);
+  if(i<0) return false;
+  const [card]=hand.splice(i,1);
+  s.table.push({player:playerIdx, card});
+  if(s.table.length===1) s.turn = 1-playerIdx;   // tocca all'altro rispondere
+  else s.phase='resolve';                         // giocate entrambe
+  return true;
+}
+function settleTrick(s){
+  const [a,b]=s.table;
+  const w = trickWinnerPlayer(a,b,s.briscolaSuit);
+  const pts = points(a.card.rank)+points(b.card.rank);
+  s.piles[w].push(a.card,b.card);
+  s.points[w]+=pts;
+  s.winnerHighlight=w;
+  s.lastTrick={winner:w, points:pts};
+  s.phase='settled';
+}
+function finishTrick(s){
+  const w=s.lastTrick.winner;
+  for(const p of [w, 1-w]) if(s.drawPile.length) s.hands[p].push(s.drawPile.shift());
+  s.table=[]; s.winnerHighlight=null;
+  s.leader=w; s.turn=w;
+  if(s.hands[0].length===0 && s.hands[1].length===0){
+    const [x,y]=s.points;
+    const winner = x>y?0 : (y>x?1:null);
+    s.over={winner};
+    if(!s.winCounted){ if(winner!==null) s.wins[winner]++; s.winCounted=true; }
+    s.phase='over';
+  } else s.phase='play';
+}
+
+/* ---------- IA (avversario computer) ---------- */
+function beats(resp, led, briscola){
+  if(resp.suit===led.suit) return power(resp.rank) > power(led.rank);
+  if(resp.suit===briscola) return true;
+  return false;
+}
+function aiLead(hand, briscola){
+  return [...hand].sort((a,b)=>{
+    const ab=a.suit===briscola?1:0, bb=b.suit===briscola?1:0;
+    if(ab!==bb) return ab-bb;
+    if(points(a.rank)!==points(b.rank)) return points(a.rank)-points(b.rank);
+    return power(a.rank)-power(b.rank);
+  })[0];
+}
+function aiRespond(hand, led, briscola){
+  const tablePts = points(led.rank);
+  const winners = hand.filter(c=>beats(c,led,briscola));
+  if(winners.length){
+    const cheap = [...winners].sort((a,b)=>{
+      const ab=a.suit===briscola?1:0, bb=b.suit===briscola?1:0;
+      if(ab!==bb) return ab-bb;
+      if(power(a.rank)!==power(b.rank)) return power(a.rank)-power(b.rank);
+      return points(a.rank)-points(b.rank);
+    })[0];
+    const usingBriscola = cheap.suit===briscola;
+    if(tablePts>=10) return cheap;                       // Asso o Tre sul tavolo: prendo
+    if(!usingBriscola && tablePts>=3) return cheap;      // prendo Re/Cavallo/Fante senza sprecare briscola
+    if(usingBriscola && tablePts>=6) return cheap;       // spendo briscola solo per bottino grosso
+  }
+  // scarto il liscio più basso, conservando le briscole
+  return [...hand].sort((a,b)=>{
+    if(points(a.rank)!==points(b.rank)) return points(a.rank)-points(b.rank);
+    const ab=a.suit===briscola?1:0, bb=b.suit===briscola?1:0;
+    if(ab!==bb) return ab-bb;
+    return power(a.rank)-power(b.rank);
+  })[0];
+}
+function aiChoose(s, ai){
+  return s.table.length===0 ? aiLead(s.hands[ai], s.briscolaSuit).id
+                            : aiRespond(s.hands[ai], s.table[0].card, s.briscolaSuit).id;
+}
+
+/* ---------- vista per un giocatore (nasconde la mano avversaria) ---------- */
+function viewFor(s, idx){
+  const opp=1-idx;
+  return {
+    you:{name:s.names[idx], points:s.points[idx], wins:s.wins[idx], hand:s.hands[idx]},
+    opp:{name:s.names[opp], points:s.points[opp], wins:s.wins[opp], handCount:s.hands[opp].length},
+    briscolaCard:s.briscolaCard, briscolaSuit:s.briscolaSuit, deckCount:s.drawPile.length,
+    table:s.table.map(t=>({who:t.player===idx?'you':'opp', card:t.card})),
+    turn:s.turn===idx?'you':'opp',
+    phase:s.phase,
+    yourTurn:(s.turn===idx && s.phase==='play'),
+    winner:s.winnerHighlight==null?null:(s.winnerHighlight===idx?'you':'opp'),
+    lastTrick:s.lastTrick?{who:s.lastTrick.winner===idx?'you':'opp', points:s.lastTrick.points}:null,
+    over:s.over?{youPoints:s.points[idx], oppPoints:s.points[opp],
+                 youWon:s.over.winner===idx, draw:s.over.winner===null,
+                 youWins:s.wins[idx], oppWins:s.wins[opp]}:null
+  };
+}
+
+/* =========================================================================
+   RENDERING
+   ========================================================================= */
+const app = document.getElementById('app');
+const overlay = document.getElementById('overlay');
+function el(html){ const t=document.createElement('template'); t.innerHTML=html.trim(); return t.content.firstElementChild; }
+
+function suitSVG(suit){
+  const p={
+    denari:'<circle cx="50" cy="50" r="40"/><circle cx="50" cy="50" r="26" fill="none" stroke="rgba(0,0,0,.25)" stroke-width="5"/><circle cx="50" cy="50" r="11" fill="rgba(0,0,0,.2)"/>',
+    coppe:'<path d="M26 20 H74 Q74 48 50 55 Q26 48 26 20 Z"/><rect x="46" y="53" width="8" height="20" rx="2"/><path d="M32 78 Q50 68 68 78 Q50 84 32 78 Z"/>',
+    spade:'<path d="M50 8 L60 42 L55 72 H45 L40 42 Z"/><rect x="32" y="70" width="36" height="8" rx="3"/><rect x="45" y="76" width="10" height="16" rx="2"/>',
+    bastoni:'<path d="M41 92 L46 46 Q50 36 54 46 L59 92 Z"/><circle cx="50" cy="34" r="13"/><circle cx="36" cy="46" r="7"/><circle cx="64" cy="46" r="7"/>'
+  };
+  return '<svg class="suit-svg" viewBox="0 0 100 100" fill="currentColor" aria-hidden="true">'+p[suit]+'</svg>';
+}
+function cardHTML(card, opt){
+  opt=opt||{};
+  const small=opt.small?' small':'';
+  if(opt.faceDown) return '<div class="card back'+small+'"><span class="back-art"></span></div>';
+  const lab=rankLabel(card.rank);
+  const cls='card suit-'+card.suit+small+(opt.playable?' playable':'')+(isFace(card.rank)?' face':'');
+  const attrs=opt.playable?' data-id="'+card.id+'" tabindex="0" role="button" aria-label="Gioca '+lab+' di '+card.suit+'"':'';
+  return '<div class="'+cls+'"'+attrs+'>'
+    +'<span class="corner tl"><span class="rk">'+lab+'</span>'+suitSVG(card.suit)+'</span>'
+    +'<span class="pip">'+suitSVG(card.suit)+'</span>'
+    +'<span class="corner br"><span class="rk">'+lab+'</span>'+suitSVG(card.suit)+'</span></div>';
+}
+
+function renderTable(v){
+  const oppActive = v.turn==='opp' && v.phase==='play';
+  const youActive = v.yourTurn;
+
+  const oppHand = Array.from({length:v.opp.handCount}, ()=>cardHTML(null,{faceDown:true,small:true})).join('');
+  const youHand = v.you.hand.map(c=>cardHTML(c,{playable:youActive})).join('');
+
+  // zona mazzo + briscola
+  let deckHTML='';
+  if(v.deckCount>1){
+    deckHTML='<div class="deckstack">'+cardHTML(null,{faceDown:true})
+      +'<div class="briscola">'+cardHTML(v.briscolaCard,{})+'</div></div>';
+  } else if(v.deckCount===1){
+    deckHTML='<div class="deckstack"><div class="briscola" style="left:0;top:0;transform:rotate(90deg)">'+cardHTML(v.briscolaCard,{})+'</div></div>';
+  } else {
+    deckHTML='<div class="deckstack" style="opacity:.35;display:grid;place-items:center"><span style="font-size:12px;color:var(--inchiostro-dim)">mazzo<br>finito</span></div>';
+  }
+
+  // zona presa
+  let trick;
+  if(v.table.length===0){
+    trick='<div class="trick-empty">'+(youActive?'Tocca a te: scegli una carta':'In attesa della giocata…')+'</div>';
+  } else {
+    trick = v.table.map(t=>{
+      const win = v.winner && ((t.who==='you'&&v.winner==='you')||(t.who==='opp'&&v.winner==='opp'));
+      const who = t.who==='you' ? v.you.name : v.opp.name;
+      return '<div class="played'+(win?' win':'')+'"><span class="who">'+esc(who)+'</span>'+cardHTML(t.card,{})+'</div>';
+    }).join('');
+  }
+
+  const toast = v.lastTrick
+    ? '<div class="toast">'+ (v.lastTrick.who==='you'?'Presa tua':'Presa di '+esc(v.opp.name))
+      +' · +'+v.lastTrick.points+' punti</div>'
+    : '';
+
+  app.innerHTML =
+   '<div class="felt">'
+   + '<div class="topbar"><span class="brand">Briscola</span>'
+   +   '<button class="icon-btn" id="btnMenu">Menu</button></div>'
+   + '<div class="seat opp">'
+   +   '<div class="nameplate'+(oppActive?' active':'')+'"><span class="nm">'+esc(v.opp.name)+'</span>'
+   +     '<span class="pts"><b>'+v.opp.points+'</b> pt</span>'
+   +     (v.opp.wins||v.you.wins?'<span class="wins">('+v.opp.wins+' vinte)</span>':'')+'</div>'
+   +   '<div class="hand opp">'+oppHand+'</div>'
+   + '</div>'
+   + '<div class="mid">'+toast
+   +   '<div class="deckzone">'+deckHTML+'<div class="deckcount">carte nel mazzo: <b>'+v.deckCount+'</b></div></div>'
+   +   '<div class="trickzone">'+trick+'</div>'
+   +   '<div class="brisc-badge"><div class="ring suit-'+v.briscolaSuit+'">'+suitSVG(v.briscolaSuit)+'</div><span>briscola</span></div>'
+   + '</div>'
+   + '<div class="seat you">'
+   +   '<div class="hand'+(youActive?'':' dim')+'" id="youHand">'+youHand+'</div>'
+   +   '<div class="nameplate'+(youActive?' active':'')+'"><span class="nm">'+esc(v.you.name)+' (tu)</span>'
+   +     '<span class="pts"><b>'+v.you.points+'</b> pt</span>'
+   +     (v.opp.wins||v.you.wins?'<span class="wins">('+v.you.wins+' vinte)</span>':'')+'</div>'
+   + '</div>'
+   + '</div>';
+
+  document.getElementById('btnMenu').onclick = confirmQuit;
+  if(youActive){
+    document.getElementById('youHand').querySelectorAll('.card.playable').forEach(cardEl=>{
+      cardEl.onclick = ()=>playFromUI(cardEl.dataset.id);
+      cardEl.onkeydown = e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); playFromUI(cardEl.dataset.id); } };
+    });
+  }
+  if(v.over) showGameOver(v);
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* =========================================================================
+   CONTROLLER  (G = stato del client)
+   ========================================================================= */
+const G = { mode:null, role:null, state:null, perspective:0, busy:false, wins:[0,0], lastView:null };
+
+/* -------- modalità locali: computer / due giocatori -------- */
+function advanceLocal(){
+  const s=G.state;
+  if(s.phase==='over'){ renderTable(viewFor(s, G.perspective)); return; }
+
+  if(s.phase==='resolve'){
+    renderTable(viewFor(s,G.perspective));
+    G.busy=true;
+    setTimeout(()=>{
+      settleTrick(s); renderTable(viewFor(s,G.perspective));
+      setTimeout(()=>{ finishTrick(s); G.busy=false; advanceLocal(); }, 1300);
+    }, 750);
+    return;
+  }
+  // phase play
+  const actor=s.turn;
+  if(G.mode==='ai' && actor===1){
+    G.perspective=0; renderTable(viewFor(s,0)); G.busy=true;
+    setTimeout(()=>{ playCard(s,1,aiChoose(s,1)); G.busy=false; advanceLocal(); }, 850);
+    return;
+  }
+  if(G.mode==='2p' && G.perspective!==actor){
+    showHandoff(s.names[actor], ()=>{ G.perspective=actor; hideOverlay(); renderTable(viewFor(s,actor)); });
+    return;
+  }
+  G.perspective = (G.mode==='ai')?0:actor;
+  renderTable(viewFor(s,G.perspective)); // attende il tocco
+}
+function localPlay(cardId){
+  const s=G.state; if(G.busy || s.phase!=='play') return;
+  if(G.mode==='ai' && s.turn!==0) return;
+  if(playCard(s, s.turn, cardId)) advanceLocal();
+}
+
+/* -------- modalità online: host (motore) / guest (client sottile) -------- */
+function broadcast(){
+  const s=G.state;
+  renderTable(viewFor(s,0));                 // host è il giocatore 0
+  net.send({type:'view', view:viewFor(s,1)}); // vista per il guest
+}
+function advanceHost(){
+  const s=G.state;
+  broadcast();
+  if(s.phase==='over') return;
+  if(s.phase==='resolve'){
+    G.busy=true;
+    setTimeout(()=>{
+      settleTrick(s); broadcast();
+      setTimeout(()=>{ finishTrick(s); G.busy=false; advanceHost(); }, 1300);
+    }, 750);
+  }
+  // se phase play: si aspetta la giocata di host (click) o guest (messaggio)
+}
+function hostPlay(cardId){
+  const s=G.state; if(G.busy || s.phase!=='play' || s.turn!==0) return;
+  if(playCard(s,0,cardId)) advanceHost();
+}
+function onGuestMsg(m){
+  const s=G.state;
+  if(m.type==='name'){ G.oppName=m.name; if(!G.state) startOnlineGame(); else { s.names[1]=m.name; broadcast(); } }
+  else if(m.type==='play'){ if(s && s.turn===1 && s.phase==='play' && !G.busy && playCard(s,1,m.cardId)) advanceHost(); }
+  else if(m.type==='rematch'){ startOnlineGame(); }
+}
+function onHostMsg(m){
+  if(m.type==='view'){
+    G.lastView=m.view; renderTable(m.view);
+  }
+}
+function guestPlay(cardId){
+  const v=G.lastView; if(!v || !v.yourTurn) return;
+  net.send({type:'play', cardId});
+  v.yourTurn=false; renderTable(v);           // blocco ottimistico fino al prossimo aggiornamento
+}
+function startOnlineGame(){
+  G.state = createState([G.myName||'Host', G.oppName||'Ospite'], G.wins);
+  G.wins = G.state.wins;
+  advanceHost();
+}
+
+/* -------- dispatch click carta -------- */
+function playFromUI(cardId){
+  if(G.mode==='online') (G.role==='host'?hostPlay:guestPlay)(cardId);
+  else localPlay(cardId);
+}
+
+/* =========================================================================
+   SCHERMATE
+   ========================================================================= */
+function showMenu(){
+  net.close();
+  G.mode=null; G.role=null; G.state=null; G.wins=[0,0]; G.lastView=null;
+  hideOverlay();
+  app.innerHTML =
+   '<div class="menu">'
+   + '<div class="lamp"><h1 class="title">Briscola</h1></div>'
+   + '<div class="suits-row">'
+   +   '<span class="suit-denari">'+suitSVG('denari')+'</span>'
+   +   '<span class="suit-coppe">'+suitSVG('coppe')+'</span>'
+   +   '<span class="suit-spade">'+suitSVG('spade')+'</span>'
+   +   '<span class="suit-bastoni">'+suitSVG('bastoni')+'</span>'
+   + '</div>'
+   + '<p class="tagline">Il gioco di carte italiano. Niente account, niente installazioni: si apre e si gioca.</p>'
+   + '<div class="menu-actions">'
+   +   '<button class="btn primary" id="mOnline">Gioca online con un amico</button>'
+   +   '<button class="btn" id="mAI">Sfida il computer</button>'
+   +   '<button class="btn" id="m2p">Due giocatori · stesso schermo</button>'
+   +   '<button class="btn ghost" id="mRules">Come si gioca</button>'
+   + '</div></div>';
+  document.getElementById('mOnline').onclick=showOnlineChoice;
+  document.getElementById('mAI').onclick=()=>startLocal('ai',['Tu','Computer']);
+  document.getElementById('m2p').onclick=show2pSetup;
+  document.getElementById('mRules').onclick=showRules;
+}
+
+function startLocal(mode, names){
+  G.mode=mode; G.role=null; G.wins=[0,0];
+  G.state=createState(names, G.wins); G.wins=G.state.wins;
+  G.perspective = mode==='ai' ? 0 : G.state.turn;
+  hideOverlay();
+  if(mode==='2p') advanceLocal(); else advanceLocal();
+}
+
+function show2pSetup(){
+  app.innerHTML =
+   '<div class="menu"><div class="panel">'
+   + '<h2>Due giocatori</h2>'
+   + '<p class="sub">Si gioca sullo stesso dispositivo, passandolo di mano in mano. Le carte di ognuno restano coperte all\'altro.</p>'
+   + '<label class="fld">Nome giocatore 1</label><input class="txt" id="n1" value="Giocatore 1" maxlength="16">'
+   + '<label class="fld">Nome giocatore 2</label><input class="txt" id="n2" value="Giocatore 2" maxlength="16">'
+   + '<div class="row"><button class="btn" id="back">Indietro</button><button class="btn primary" id="go">Inizia la partita</button></div>'
+   + '</div></div>';
+  document.getElementById('back').onclick=showMenu;
+  document.getElementById('go').onclick=()=>{
+    const a=(document.getElementById('n1').value||'Giocatore 1').trim();
+    const b=(document.getElementById('n2').value||'Giocatore 2').trim();
+    startLocal('2p',[a,b]);
+  };
+}
+
+/* ---------- online: scelta ruolo ---------- */
+const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // niente O/0/I/1: si detta senza ambiguità
+function genCode(){ let s=''; for(let i=0;i<6;i++) s+=CODE_ALPHABET[Math.floor(Math.random()*CODE_ALPHABET.length)]; return s; }
+
+function showOnlineChoice(){
+  if(typeof Peer==='undefined' || typeof RTCPeerConnection==='undefined'){
+    app.innerHTML='<div class="menu"><div class="panel"><h2>Gioco online non disponibile</h2>'
+      +'<p class="sub">Il browser non riesce a caricare la parte online (serve una connessione a internet e un browser normale come Chrome, Firefox, Safari o Edge). Se sei nell\'anteprima della chat, scarica il file e aprilo con un doppio clic.</p>'
+      +'<button class="btn" onclick="showMenu()">Torna al menu</button></div></div>';
+    return;
+  }
+  app.innerHTML =
+   '<div class="menu"><div class="panel">'
+   + '<h2>Gioca online</h2>'
+   + '<p class="sub">Uno crea la partita e ottiene un codice di 6 lettere. L\'altro digita quel codice ed entra. Le carte viaggiano dirette tra i due computer.</p>'
+   + '<label class="fld">Il tuo nome</label><input class="txt" id="myname" value="" placeholder="Come ti chiami?" maxlength="16">'
+   + '<div class="row"><button class="btn primary" id="host">Crea la partita</button><button class="btn" id="join">Entra con un codice</button></div>'
+   + '<div class="row"><button class="btn ghost" id="back">Indietro</button></div>'
+   + '</div></div>';
+  document.getElementById('back').onclick=showMenu;
+  document.getElementById('host').onclick=()=>{ G.myName=nameVal(); startHost(); };
+  document.getElementById('join').onclick=()=>{ G.myName=nameVal(); startJoin(); };
+  const mn=document.getElementById('myname'); mn.focus();
+}
+function nameVal(){ const v=(document.getElementById('myname').value||'').trim(); return v||'Giocatore'; }
+
+/* ---------- HOST flow (crea codice) ---------- */
+function startHost(){
+  G.mode='online'; G.role='host'; G.wins=[0,0]; connLostShown=false;
+  net.reset();
+  net.onOpen = ()=>{ /* la partita parte quando arriva il nome del guest */ };
+  net.onData = onGuestMsg;
+  net.onState = onConnState;
+  const code=genCode();
+  hostWaiting(code, 'Preparo il codice…', 'wait');
+  net.host(code, {
+    ready: ()=> hostWaiting(code, 'In attesa che il tuo amico entri col codice…', 'wait'),
+    error: e=>{
+      if(e && e.type==='unavailable-id'){ startHost(); return; }   // codice già in uso: ne genero un altro
+      if(e && e.type==='browser-incompatible'){ onlineError('Questo browser non supporta il gioco online.'); return; }
+      hostWaiting(code, 'Problema col servizio di collegamento. Riprova tra poco.', 'err');
+    }
+  });
+}
+function hostWaiting(code, statusMsg, kind){
+  const letters = code.split('').map(c=>'<span class="cd">'+c+'</span>').join('');
+  app.innerHTML =
+   '<div class="menu"><div class="panel" style="text-align:center">'
+   + '<h2>Il tuo codice partita</h2>'
+   + '<p class="sub" style="text-align:center">Dettalo o mandalo al tuo amico: lui sceglie “Entra con un codice” e lo digita.</p>'
+   + '<div class="codebox" id="codebox">'+letters+'</div>'
+   + '<button class="btn small-copy-btn" id="copyCode">Copia il codice</button>'
+   + '<div class="status '+(kind||'wait')+'" id="cst">'+esc(statusMsg||'')+'</div>'
+   + '<div class="row"><button class="btn" id="cancel">Annulla</button></div>'
+   + '</div></div>';
+  document.getElementById('cancel').onclick=showMenu;
+  document.getElementById('copyCode').onclick=()=>{
+    const b=document.getElementById('copyCode');
+    const done=()=>{ const t=b.textContent; b.textContent='Copiato ✓'; setTimeout(()=>b.textContent=t,1400); };
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done,done);
+    else done();
+  };
+}
+function onConnState(state){
+  if(G.mode!=='online') return;
+  if(state==='connected'){
+    if(G.role==='host' && !G.state) setStatus('cst','Amico collegato! Avvio della partita…','ok');
+  } else if(state==='lost'){
+    connectionLost();
+  }
+}
+
+/* ---------- GUEST flow (entra col codice) ---------- */
+function startJoin(){
+  G.mode='online'; G.role='guest'; G.wins=[0,0]; connLostShown=false;
+  net.reset();
+  net.onData = onHostMsg;
+  net.onOpen = ()=>{ net.send({type:'name', name:G.myName}); guestWaiting(); };
+  net.onState = onConnState;
+  app.innerHTML =
+   '<div class="menu"><div class="panel" style="text-align:center">'
+   + '<h2>Entra nella partita</h2>'
+   + '<p class="sub" style="text-align:center">Digita le 6 lettere che ti ha dato il tuo amico.</p>'
+   + '<input class="txt codeinput" id="joincode" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDEF">'
+   + '<div class="status wait" id="gst">Chiedi il codice a chi ha creato la partita.</div>'
+   + '<div class="row"><button class="btn" id="back">Indietro</button><button class="btn primary" id="enter">Entra</button></div>'
+   + '</div></div>';
+  const inp=document.getElementById('joincode');
+  inp.oninput=()=>{ inp.value=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6); };
+  inp.onkeydown=e=>{ if(e.key==='Enter') document.getElementById('enter').click(); };
+  inp.focus();
+  document.getElementById('back').onclick=showMenu;
+  document.getElementById('enter').onclick=()=>{
+    const code=(inp.value||'').trim().toUpperCase();
+    if(code.length!==6){ setStatus('gst','Il codice è di 6 caratteri.','err'); return; }
+    setStatus('gst','Mi collego…','wait');
+    net.join(code, {
+      error: e=>{
+        if(e && e.type==='peer-unavailable') setStatus('gst','Codice non trovato. Ricontrolla le lettere, o fai ricreare la partita al tuo amico.','err');
+        else if(e && e.type==='browser-incompatible') setStatus('gst','Questo browser non supporta il gioco online.','err');
+        else setStatus('gst','Non riesco a collegarmi. Riprova tra poco.','err');
+      }
+    });
+  };
+}
+function guestWaiting(){
+  app.innerHTML='<div class="menu"><div class="panel" style="text-align:center">'
+    +'<div class="handoff-icon">🔗</div><h2>Collegato!</h2>'
+    +'<p class="sub" style="text-align:center">In attesa che parta la prima mano…</p></div></div>';
+}
+
+/* ---------- overlays: handoff / game over / rules / disconnect ---------- */
+function overlayHTML(html){ overlay.innerHTML=html; overlay.classList.toggle('show', !!html); }
+function hideOverlay(){ overlay.classList.remove('show'); overlay.innerHTML=''; }
+
+function showHandoff(name, cont){
+  overlayHTML('<div class="ov-card"><div class="handoff-icon">📱→👤</div>'
+    +'<h2>Passa a '+esc(name)+'</h2>'
+    +'<p>Consegna il dispositivo. Quando sei pronto, tocca per vedere la tua mano.</p>'
+    +'<button class="btn primary" id="hgo">Sono '+esc(name)+', continua</button></div>');
+  document.getElementById('hgo').onclick=cont;
+}
+
+function showGameOver(v){
+  const o=v.over;
+  const title = o.draw ? 'Pareggio: 60 a 60' : (o.youWon
+     ? (G.mode==='ai'?'Hai vinto! 🎉':'Vince '+esc(v.you.name)+' 🎉')
+     : (G.mode==='ai'?'Ha vinto il computer':'Vince '+esc(v.opp.name)));
+  overlayHTML('<div class="ov-card"><h2>'+title+'</h2>'
+    +'<div class="final-score">'
+    +  '<div class="col'+(o.youWon?' win':'')+'"><div class="n">'+esc(v.you.name)+'</div><div class="v">'+o.youPoints+'</div></div>'
+    +  '<div class="col'+((!o.youWon&&!o.draw)?' win':'')+'"><div class="n">'+esc(v.opp.name)+'</div><div class="v">'+o.oppPoints+'</div></div>'
+    +'</div>'
+    +(o.youWins||o.oppWins?'<p style="margin-top:-6px">Serie: '+esc(v.you.name)+' '+o.youWins+' – '+o.oppWins+' '+esc(v.opp.name)+'</p>':'')
+    +'<div class="row"><button class="btn" id="ovMenu">Menu</button><button class="btn primary" id="ovAgain">Rivincita</button></div>'
+    +'</div>');
+  document.getElementById('ovMenu').onclick=showMenu;
+  document.getElementById('ovAgain').onclick=rematch;
+}
+function rematch(){
+  hideOverlay();
+  if(G.mode==='online'){
+    if(G.role==='host'){ startOnlineGame(); }
+    else { net.send({type:'rematch'}); guestWaiting(); }
+  } else {
+    G.state=createState(G.state.names, G.wins); G.wins=G.state.wins;
+    G.perspective = G.mode==='ai'?0:G.state.turn;
+    advanceLocal();
+  }
+}
+function confirmQuit(){
+  overlayHTML('<div class="ov-card"><h2>Uscire dalla partita?</h2>'
+    +'<p>La mano in corso andrà persa'+(G.mode==='online'?' e la connessione verrà chiusa.':'.')+'</p>'
+    +'<div class="row"><button class="btn" id="qStay">Resta</button><button class="btn primary" id="qGo">Esci al menu</button></div></div>');
+  document.getElementById('qStay').onclick=()=>{ hideOverlay(); if(G.lastView&&G.role==='guest') renderTable(G.lastView); else if(G.state) renderTable(viewFor(G.state,G.perspective)); };
+  document.getElementById('qGo').onclick=showMenu;
+}
+let connLostShown=false;
+function connectionLost(){
+  if(connLostShown) return; connLostShown=true;
+  overlayHTML('<div class="ov-card"><div class="handoff-icon">📴</div><h2>Connessione interrotta</h2>'
+    +'<p>Il collegamento diretto con l\'altro giocatore non è riuscito o si è chiuso. '
+    +'Di solito basta riprovare. Se non si collega proprio, controllate che siate entrambi online e provate a <b>scaricare il file e aprirlo</b> nel browser (fuori dall\'anteprima), oppure da una rete meno restrittiva.</p>'
+    +'<button class="btn primary" id="clMenu">Torna al menu</button></div>');
+  document.getElementById('clMenu').onclick=()=>{ connLostShown=false; showMenu(); };
+}
+function onlinePanel(title, msg){
+  app.innerHTML='<div class="menu"><div class="panel" style="text-align:center"><h2>'+title+'</h2><p class="sub" style="text-align:center">'+msg+'</p></div></div>';
+}
+function onlineError(msg){
+  app.innerHTML='<div class="menu"><div class="panel"><h2>Ops</h2><p class="sub">'+esc(msg)+'</p><button class="btn" onclick="showMenu()">Torna al menu</button></div></div>';
+}
+
+function showRules(){
+  const val = r=>'<span class="chip">'+r.l+' <b>'+r.p+'</b></span>';
+  overlayHTML('<div class="ov-card" style="text-align:left">'
+    +'<h2 style="text-align:center">Come si gioca</h2>'
+    +'<div class="rules-list">'
+    +'<p>Mazzo italiano da 40 carte, quattro semi: denari, coppe, spade, bastoni. Vince chi supera i <b>60 punti</b> su 120 totali.</p>'
+    +'<h3>Valore delle carte</h3>'
+    +'<div class="valrow">'
+    + val({l:'Asso',p:11})+val({l:'Tre',p:10})+val({l:'Re',p:4})+val({l:'Cavallo',p:3})+val({l:'Fante',p:2})+val({l:'2·4·5·6·7',p:0})
+    +'</div>'
+    +'<h3>Chi prende la mano</h3>'
+    +'<p>La carta più forte vince: Asso &gt; 3 &gt; Re &gt; Cavallo &gt; Fante &gt; 7 &gt; 6 &gt; 5 &gt; 4 &gt; 2. '
+    +'La <b>briscola</b> (il seme scoperto a inizio partita) batte qualsiasi altro seme. '
+    +'Se rispondi con un seme diverso e non di briscola, perdi la mano.</p>'
+    +'<h3>Svolgimento</h3>'
+    +'<p>Tre carte a testa. Chi vince la presa incassa i punti, pesca per primo e apre la mano successiva. '
+    +'Si pesca finché il mazzo non finisce (la briscola è l\'ultima carta), poi si giocano le ultime tre.</p>'
+    +'</div>'
+    +'<button class="btn primary" id="rClose" style="margin-top:18px">Ho capito</button></div>');
+  document.getElementById('rClose').onclick=hideOverlay;
+}
+
+/* ---------- utility UI ---------- */
+function setStatus(id,msg,kind){ const e=document.getElementById(id); if(!e)return; e.textContent=msg; e.className='status'+(kind?' '+kind:''); }
+function copyEl(id,btnId){
+  const ta=document.getElementById(id); ta.select(); ta.setSelectionRange(0,99999);
+  const done=()=>{ const b=document.getElementById(btnId); const t=b.textContent; b.textContent='Copiato ✓'; setTimeout(()=>b.textContent=t,1400); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value).then(done, ()=>{document.execCommand('copy');done();}); }
+  else { document.execCommand('copy'); done(); }
+}
+
+/* =========================================================================
+   TRASPORTO — WebRTC P2P con segnalazione via PeerJS (codice a 6 caratteri).
+   Il centralino PeerJS serve SOLO a mettere in contatto i due browser;
+   una volta connessi, le carte viaggiano dirette (data channel P2P).
+   ========================================================================= */
+const net = (function(){
+  let peer=null, conn=null, intentional=false, everOpen=false;
+  const api={ onOpen:null, onData:null, onState:null };
+  const emit=s=>{ if(api.onState) api.onState(s); };
+  const opts={ config:{ iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'}
+  ]}};
+
+  function reset(){ close(); }
+  function close(){
+    intentional=true; everOpen=false;
+    try{ if(conn) conn.close(); }catch(e){}
+    try{ if(peer) peer.destroy(); }catch(e){}
+    conn=null; peer=null;
+  }
+  function wire(c){
+    conn=c;
+    c.on('open', ()=>{ everOpen=true; emit('connected'); if(api.onOpen) api.onOpen(); });
+    c.on('data', d=>{ if(api.onData) api.onData(d); });
+    c.on('close', ()=>{ if(!intentional && everOpen) emit('lost'); });
+    c.on('error', ()=>{ if(!intentional && everOpen) emit('lost'); });
+  }
+  function host(code, cb){
+    close(); intentional=false; everOpen=false;
+    cb=cb||{};
+    peer=new Peer('briscolagame'+code, opts);
+    peer.on('open', ()=>{ if(cb.ready) cb.ready(); });
+    peer.on('connection', c=>wire(c));
+    peer.on('error', e=>{ if(cb.error) cb.error(e); });
+    peer.on('disconnected', ()=>{ if(!intentional){ try{ peer.reconnect(); }catch(e){} } });
+  }
+  function join(code, cb){
+    close(); intentional=false; everOpen=false;
+    cb=cb||{};
+    peer=new Peer(undefined, opts);              // id casuale
+    peer.on('open', ()=>{ wire(peer.connect('briscolagame'+code, {reliable:true})); });
+    peer.on('error', e=>{ if(cb.error) cb.error(e); });
+    peer.on('disconnected', ()=>{ if(!intentional){ try{ peer.reconnect(); }catch(e){} } });
+  }
+  function send(obj){ try{ if(conn && conn.open) conn.send(obj); }catch(e){} }
+
+  return { reset, close, host, join, send,
+    get onOpen(){return api.onOpen}, set onOpen(f){api.onOpen=f},
+    get onData(){return api.onData}, set onData(f){api.onData=f},
+    get onState(){return api.onState}, set onState(f){api.onState=f} };
+})();
+
+/* avvio */
+showMenu();
+</script>
+</body>
+</html>
